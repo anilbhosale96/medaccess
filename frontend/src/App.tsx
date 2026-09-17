@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { LandingPage } from './components/LandingPage';
+import { LoginPage } from './components/LoginPage';
+import { HospitalDashboard } from './components/HospitalDashboard';
 import { EmergencyHeader } from './components/EmergencyHeader';
 import { BiometricScanner } from './components/BiometricScanner';
 import { ManualSearch } from './components/ManualSearch';
@@ -7,14 +10,19 @@ import { AITriageSummary } from './components/AITriageSummary';
 import { AuditLogModal } from './components/AuditLogModal';
 import { ApiService } from './services/api';
 import { PatientFullRecord, BiometricMatchResult, AITriageResponse } from './types';
-import { ShieldAlert, Scan, Search, AlertCircle, Sparkles, ChevronRight, Activity, Zap } from 'lucide-react';
+import { ShieldAlert, Scan, Search, AlertCircle, ChevronRight, Zap } from 'lucide-react';
 
 export default function App() {
-  const [mode, setMode] = useState<'select' | 'biometric' | 'manual' | 'patient'>('select');
+  // Navigation State: 'landing' | 'login' | 'dashboard' | 'emergency-select' | 'biometric' | 'manual' | 'patient'
+  const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'emergency-select' | 'biometric' | 'manual' | 'patient'>('landing');
+  
+  // Patient & Clinical State
   const [selectedPatient, setSelectedPatient] = useState<PatientFullRecord | null>(null);
   const [matchData, setMatchData] = useState<BiometricMatchResult | null>(null);
   const [aiTriage, setAiTriage] = useState<AITriageResponse | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  
+  // System State
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,7 +45,7 @@ export default function App() {
     setSelectedPatient(patient);
     setMatchData(matchInfo || null);
     setAiTriage(null);
-    setMode('patient');
+    setView('patient');
     setErrorMessage(null);
 
     // Automatically trigger AI Triage summary upon emergency patient identification
@@ -62,26 +70,88 @@ export default function App() {
     }
   };
 
-  const handleReset = () => {
+  const handleResetEmergency = () => {
     setSelectedPatient(null);
     setMatchData(null);
     setAiTriage(null);
-    setMode('select');
+    setView('emergency-select');
     setErrorMessage(null);
   };
 
+  // 1. LANDING PAGE VIEW (Figma Design: Image 1, 2, 4)
+  if (view === 'landing') {
+    return (
+      <LandingPage
+        onGoToEmergency={() => setView('emergency-select')}
+        onGoToLogin={() => setView('login')}
+        onGoToDashboard={() => setView('dashboard')}
+      />
+    );
+  }
+
+  // 2. SIGN IN / LOGIN PAGE VIEW (Figma Design: Image 3)
+  if (view === 'login') {
+    return (
+      <LoginPage
+        onBackToHome={() => setView('landing')}
+        onLoginSuccess={() => setView('dashboard')}
+      />
+    );
+  }
+
+  // 3. HOSPITAL ER DASHBOARD VIEW (Figma Design: Image 5)
+  if (view === 'dashboard') {
+    return (
+      <>
+        <HospitalDashboard
+          onGoToEmergency={() => setView('emergency-select')}
+          onSelectCasePatient={(patient) => handlePatientIdentified(patient)}
+          onLogout={() => setView('landing')}
+          onOpenAuditLogs={() => setIsAuditModalOpen(true)}
+        />
+        <AuditLogModal
+          isOpen={isAuditModalOpen}
+          onClose={() => setIsAuditModalOpen(false)}
+        />
+      </>
+    );
+  }
+
+  // 4. EMERGENCY MODE VIEWS (Emergency Select, Biometric, Manual, Patient)
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-red-600 selection:text-white">
       {/* Emergency Top Navigation Header */}
       <EmergencyHeader
         onOpenAuditLogs={() => setIsAuditModalOpen(true)}
-        onReset={handleReset}
-        isViewingPatient={mode === 'patient'}
+        onReset={() => {
+          if (view === 'patient') {
+            setView('emergency-select');
+          } else {
+            setView('landing');
+          }
+        }}
+        isViewingPatient={view === 'patient'}
         backendOnline={backendOnline}
       />
 
-      {/* Main Responsive Body */}
+      {/* Main Responsive Emergency Viewport */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center">
+        {/* Navigation Bar inside Emergency Mode */}
+        <div className="flex items-center justify-between pb-4">
+          <button
+            onClick={() => setView('landing')}
+            className="text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1 transition"
+          >
+            ← Exit Emergency to Home
+          </button>
+          <button
+            onClick={() => setView('dashboard')}
+            className="text-xs font-semibold text-blue-400 hover:underline"
+          >
+            Switch to Hospital Dashboard
+          </button>
+        </div>
+
         {errorMessage && (
           <div className="mb-4 p-3.5 bg-red-950/80 border border-red-700 rounded-xl text-xs sm:text-sm text-red-200 flex items-center justify-between shadow-lg">
             <div className="flex items-center gap-2">
@@ -97,8 +167,8 @@ export default function App() {
           </div>
         )}
 
-        {/* 1. SELECT MODE (Main Emergency Landing Dashboard) */}
-        {mode === 'select' && (
+        {/* 4.1 EMERGENCY SELECT MODE */}
+        {view === 'emergency-select' && (
           <div className="space-y-6 py-4">
             <div className="text-center space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/90 border border-red-800 text-red-300 text-xs font-bold uppercase tracking-widest animate-pulse">
@@ -109,7 +179,7 @@ export default function App() {
                 Identify Emergency Patient
               </h2>
               <p className="text-sm text-slate-400 max-w-md mx-auto">
-                First 60 minutes determine patient survival. Instant biometric lookup or rapid manual search under Golden Hour protocols.
+                Golden Hour critical identification: Instant biometric scanning or rapid manual lookup.
               </p>
             </div>
 
@@ -117,7 +187,7 @@ export default function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
               {/* Scan Biometrics Button */}
               <button
-                onClick={() => setMode('biometric')}
+                onClick={() => setView('biometric')}
                 className="group relative p-6 sm:p-8 bg-gradient-to-br from-blue-700 to-indigo-900 hover:from-blue-600 hover:to-indigo-800 rounded-3xl border-2 border-blue-500 shadow-2xl transition-all duration-200 transform hover:-translate-y-1 text-left flex flex-col justify-between"
               >
                 <div>
@@ -140,7 +210,7 @@ export default function App() {
 
               {/* Manual Fallback Search Button */}
               <button
-                onClick={() => setMode('manual')}
+                onClick={() => setView('manual')}
                 className="group relative p-6 sm:p-8 bg-gradient-to-br from-slate-800 to-slate-900 hover:from-slate-750 hover:to-slate-850 rounded-3xl border-2 border-slate-700 hover:border-slate-500 shadow-2xl transition-all duration-200 transform hover:-translate-y-1 text-left flex flex-col justify-between"
               >
                 <div>
@@ -166,7 +236,7 @@ export default function App() {
             <div className="max-w-2xl mx-auto pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-400">
               <span className="flex items-center gap-1 font-semibold text-slate-300">
                 <Zap className="w-3.5 h-3.5 text-amber-400" />
-                Demo Golden Hour Profiles:
+                Demo Emergency Profiles:
               </span>
               <button
                 onClick={() => handlePatientIdentified(
@@ -253,18 +323,18 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. BIOMETRIC SCANNER VIEW */}
-        {mode === 'biometric' && (
+        {/* 4.2 BIOMETRIC SCANNER VIEW */}
+        {view === 'biometric' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <button
-                onClick={() => setMode('select')}
+                onClick={() => setView('emergency-select')}
                 className="text-xs font-bold text-slate-400 hover:text-white uppercase tracking-wider"
               >
                 ← Return to Mode Selection
               </button>
               <button
-                onClick={() => setMode('manual')}
+                onClick={() => setView('manual')}
                 className="text-xs text-blue-400 hover:underline"
               >
                 Switch to Manual Search
@@ -277,18 +347,18 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. MANUAL SEARCH VIEW */}
-        {mode === 'manual' && (
+        {/* 4.3 MANUAL SEARCH VIEW */}
+        {view === 'manual' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <button
-                onClick={() => setMode('select')}
+                onClick={() => setView('emergency-select')}
                 className="text-xs font-bold text-slate-400 hover:text-white uppercase tracking-wider"
               >
                 ← Return to Mode Selection
               </button>
               <button
-                onClick={() => setMode('biometric')}
+                onClick={() => setView('biometric')}
                 className="text-xs text-blue-400 hover:underline"
               >
                 Switch to Biometric Scanner
@@ -301,8 +371,8 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. PATIENT EMERGENCY CARD & CLAUDE AI TRIAGE */}
-        {mode === 'patient' && selectedPatient && (
+        {/* 4.4 PATIENT EMERGENCY PROFILE & CLAUDE AI TRIAGE */}
+        {view === 'patient' && selectedPatient && (
           <div className="space-y-5 pb-8">
             <PatientCard
               patient={selectedPatient}
@@ -325,4 +395,3 @@ export default function App() {
     </div>
   );
 }
-
