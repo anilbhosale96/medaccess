@@ -43,8 +43,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-const server = app.listen(ENV.PORT, () => {
-  console.log(`
+// Only listen to port when running standalone (not inside Vercel serverless)
+if (!process.env.VERCEL) {
+  app.listen(ENV.PORT, () => {
+    console.log(`
 ===========================================================
   🏥 MEDACCESS EMERGENCY SERVER ONLINE
   📡 Port: ${ENV.PORT}
@@ -52,8 +54,10 @@ const server = app.listen(ENV.PORT, () => {
   🔗 API:  http://localhost:${ENV.PORT}/api/v1
   🩺 Health: http://localhost:${ENV.PORT}/health
 ===========================================================
-  `);
-});
+    `);
+  });
+}
 
-export default server;
+export default app;
+
 
