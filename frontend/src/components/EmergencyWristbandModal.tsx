@@ -136,3 +136,4 @@ export const EmergencyWristbandModal: React.FC<EmergencyWristbandModalProps> = (
     </div>
   );
 };
+
