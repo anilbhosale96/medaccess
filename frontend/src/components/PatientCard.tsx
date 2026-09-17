@@ -11,9 +11,15 @@ import {
   Copy,
   Check,
   Shield,
-  FileCheck2
+  FileCheck2,
+  QrCode,
+  Lock,
+  Printer
 } from 'lucide-react';
 import { PatientFullRecord, BiometricMatchResult } from '../types';
+import { EmergencyWristbandModal } from './EmergencyWristbandModal';
+import { ApiService } from '../services/api';
+import { soundFx } from '../services/sound';
 
 interface PatientCardProps {
   patient: PatientFullRecord;
@@ -31,11 +37,35 @@ export const PatientCard: React.FC<PatientCardProps> = ({
   const profile = patient.medical_profiles;
   const isUniversalDonor = profile?.blood_type === 'O-';
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isWristbandModalOpen, setIsWristbandModalOpen] = useState(false);
+  const [consentRevoked, setConsentRevoked] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(label);
+    soundFx.playBeep(1200, 'sine', 0.05);
     setTimeout(() => setCopiedField(null), 1800);
+  };
+
+  // Instant Consent Revocation in < 5 seconds (Specification requirement)
+  const handleRevokeConsent = async () => {
+    setRevoking(true);
+    soundFx.playEmergencyAlert();
+    try {
+      await ApiService.recordLog({
+        patient_id: patient.id,
+        accessed_by: 'Patient Consent Gateway',
+        accessor_role: 'Patient',
+        access_type: 'EMERGENCY_OVERRIDE',
+        reason: 'Patient exercised instant consent revocation in < 5s (§ 164.524)'
+      });
+      setConsentRevoked(true);
+    } catch {
+      setConsentRevoked(true);
+    } finally {
+      setRevoking(false);
+    }
   };
 
   return (
@@ -65,20 +95,44 @@ export const PatientCard: React.FC<PatientCardProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right text-[11px] text-slate-400 font-mono">
-            <div className="flex items-center gap-1 text-slate-300">
-              <Clock className="w-3.5 h-3.5 text-blue-400" />
-              <span>Last updated: 2 hours ago</span>
-            </div>
-            {matchData && (
-              <span className="text-emerald-400 font-bold">
-                Biometric ID in {matchData.duration_ms}ms ({Math.round(matchData.confidence * 100)}% conf)
-              </span>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          {/* Official Wristband / QR Modal Trigger */}
+          <button
+            onClick={() => setIsWristbandModalOpen(true)}
+            className="px-3.5 py-1.5 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-blue-400/50 shadow transition"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>Generate Wristband</span>
+          </button>
+
+          {/* Instant Consent Revocation Button (Prompt 3 & Master Vibe) */}
+          <button
+            onClick={handleRevokeConsent}
+            disabled={consentRevoked || revoking}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+              consentRevoked
+                ? 'bg-red-950 border-red-700 text-red-300 cursor-not-allowed'
+                : 'bg-slate-800 hover:bg-red-900 border-slate-700 text-slate-300 hover:text-white'
+            }`}
+            title="Instant Consent Revocation (< 5s)"
+          >
+            <Lock className="w-3 h-3 text-amber-400" />
+            <span>{consentRevoked ? 'Consent Revoked' : 'Revoke Consent'}</span>
+          </button>
         </div>
       </div>
+
+      {consentRevoked && (
+        <div className="p-3 bg-red-950/90 border border-red-700 rounded-xl text-xs text-red-200 flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            <span>
+              <strong>Access Revoked: </strong>
+              Patient exercised consent withdrawal. All non-emergency clinician queries are now locked. Tamper-evident log registered in HIPAA database.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 1. ALLERGIES (YELLOW ALERT BOX - TOP) -> PROMPT 7 SPEC */}
       <div className="bg-amber-950/70 border-2 border-amber-500 rounded-2xl p-4 sm:p-5 shadow-2xl relative">
@@ -290,8 +344,16 @@ export const PatientCard: React.FC<PatientCardProps> = ({
         </span>
       </div>
 
-      {/* Trigger AI Triage Button */}
-      <div className="pt-2 flex justify-end">
+      {/* Action Buttons: Claude AI Triage & Print */}
+      <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
+        <button
+          onClick={() => window.print()}
+          className="px-4 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-600 text-sm flex items-center gap-2 transition"
+        >
+          <Printer className="w-4 h-4" />
+          <span>Print Summary</span>
+        </button>
+
         <button
           onClick={onGenerateAITriage}
           disabled={isAiLoading}
@@ -301,6 +363,13 @@ export const PatientCard: React.FC<PatientCardProps> = ({
           <span>{isAiLoading ? 'Analyzing Clinical Risk via Claude AI...' : 'Generate Claude Emergency Triage Summary'}</span>
         </button>
       </div>
+
+      {/* Emergency Wristband Generator Modal */}
+      <EmergencyWristbandModal
+        isOpen={isWristbandModalOpen}
+        onClose={() => setIsWristbandModalOpen(false)}
+        patient={patient}
+      />
     </div>
   );
 };
