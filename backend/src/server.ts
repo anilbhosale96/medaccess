@@ -1,0 +1,59 @@
+import express from 'express';
+import cors from 'cors';
+import { ENV } from './config/env';
+import { auditLoggerMiddleware } from './middleware/audit.middleware';
+import apiRouter from './routes/api.routes';
+
+const app = express();
+
+// Security & Parsing Middlewares
+app.use(cors({
+  origin: '*', // Allows Vercel frontend or local dev
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-staff-id']
+}));
+app.use(express.json({ limit: '10mb' })); // Allows base64 biometric payloads
+app.use(express.urlencoded({ extended: true }));
+app.use(auditLoggerMiddleware);
+
+// Base Health Check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'MedAccess Emergency API',
+    timestamp: new Date().toISOString(),
+    env: ENV.NODE_ENV
+  });
+});
+
+// Mount Main API Routes
+app.use('/api/v1', apiRouter);
+
+// Fallback 404
+app.use('*', (req, res) => {
+  res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled Server Error:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: ENV.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+const server = app.listen(ENV.PORT, () => {
+  console.log(`
+===========================================================
+  🏥 MEDACCESS EMERGENCY SERVER ONLINE
+  📡 Port: ${ENV.PORT}
+  🌍 Mode: ${ENV.NODE_ENV}
+  🔗 API:  http://localhost:${ENV.PORT}/api/v1
+  🩺 Health: http://localhost:${ENV.PORT}/health
+===========================================================
+  `);
+});
+
+export default server;
+
