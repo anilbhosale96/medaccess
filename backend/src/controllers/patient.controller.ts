@@ -61,17 +61,31 @@ export class PatientController {
 
   public static async searchPatients(req: Request, res: Response): Promise<void> {
     const query = ((req.query.q as string) || '').trim().toLowerCase();
-    if (!query) {
-      res.status(400).json({ error: 'Search query parameter (q) is required' });
-      return;
-    }
 
     try {
-      const results: PatientFullRecord[] = [];
+      // 1. If Supabase is configured, search Supabase
+      if (supabase) {
+        let queryBuilder = supabase.from('patients').select('*, medical_profiles(*)');
+        if (query && query !== 'all') {
+          queryBuilder = queryBuilder.or(`full_name.ilike.%${query}%,emergency_code.ilike.%${query}%,phone_hash.ilike.%${query}%`);
+        }
+        const { data, error } = await queryBuilder;
+        if (!error && data && data.length > 0) {
+          res.json({
+            success: true,
+            count: data.length,
+            data
+          });
+          return;
+        }
+      }
 
-      // Local fallback search (matches phone, emergency code, ABHA, or name)
+      // 2. Local fallback search (matches phone, emergency code, ABHA, or name)
+      const results: PatientFullRecord[] = [];
       for (const p of localStore.patients) {
         const match =
+          !query ||
+          query === 'all' ||
           p.full_name.toLowerCase().includes(query) ||
           p.phone_hash.includes(query) ||
           (p.emergency_code && p.emergency_code.toLowerCase().includes(query)) ||

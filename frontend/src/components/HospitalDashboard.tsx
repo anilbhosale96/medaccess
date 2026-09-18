@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ApiService } from '../services/api';
 import {
   Zap,
   ShieldAlert,
@@ -88,7 +89,29 @@ export const HospitalDashboard: React.FC<HospitalDashboardProps> = ({
     sunrise: 0
   });
 
-  // Master patient dataset matching Figma SS
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [livePatients, setLivePatients] = useState<PatientFullRecord[]>([]);
+  const backendInfo = ApiService.getBackendInfo();
+
+  useEffect(() => {
+    const check = async () => {
+      const ok = await ApiService.checkHealth();
+      setBackendConnected(ok);
+      if (ok) {
+        try {
+          const dbPatients = await ApiService.searchPatients('');
+          if (dbPatients && dbPatients.length > 0) {
+            setLivePatients(dbPatients);
+          }
+        } catch {
+          // Keep mock cases
+        }
+      }
+    };
+    check();
+    const interval = setInterval(check, 10000);
+    return () => clearInterval(interval);
+  }, []);
   const allPatients: Array<{
     caseId: string;
     patientName: string;
@@ -547,9 +570,18 @@ export const HospitalDashboard: React.FC<HospitalDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live API Status Badge */}
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+              backendConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`} title={backendInfo.url}>
+              <span className={`w-2 h-2 rounded-full ${backendConnected ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
+              <span className="hidden sm:inline font-mono">{backendInfo.isCloud ? 'Cloud API' : 'Local API'}</span>
+              <span>{backendConnected ? 'Connected' : 'Connecting...'}</span>
+            </div>
+
             {/* Live ER Badge */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <span>ER Live</span>
             </div>
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { ShieldAlert, Activity, FileText, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, Activity, FileText, ArrowLeft, Globe } from 'lucide-react';
+import { ApiService } from '../services/api';
 
 interface EmergencyHeaderProps {
   onOpenAuditLogs: () => void;
@@ -14,6 +15,7 @@ export const EmergencyHeader: React.FC<EmergencyHeaderProps> = ({
   isViewingPatient,
   backendOnline,
 }) => {
+  const backendInfo = ApiService.getBackendInfo();
   return (
     <header className="bg-emergency-700 text-white shadow-xl sticky top-0 z-40 border-b-2 border-emergency-800">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -51,14 +53,14 @@ export const EmergencyHeader: React.FC<EmergencyHeaderProps> = ({
 
         <div className="flex items-center space-x-2 sm:space-x-3">
           {/* Connection Status */}
-          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-black/20 border border-white/10">
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-black/30 border border-white/10" title={backendInfo.url}>
             <span
               className={`w-2 h-2 rounded-full ${
-                backendOnline ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
+                backendOnline ? (backendInfo.isCloud ? 'bg-lime-400 animate-ping' : 'bg-emerald-400') : 'bg-amber-400'
               }`}
             />
-            <span className="text-xs text-slate-100">
-              {backendOnline ? 'CONNECTED' : 'STANDALONE'}
+            <span className="text-xs text-slate-100 font-mono tracking-tight">
+              {backendOnline ? (backendInfo.isCloud ? 'CLOUD API' : 'LOCAL API') : 'OFFLINE'}
             </span>
           </div>
 

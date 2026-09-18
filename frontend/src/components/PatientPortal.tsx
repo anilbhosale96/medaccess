@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ApiService } from '../services/api';
 import {
   Home,
   User,
@@ -46,6 +47,7 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
   // Logged-in patient state
   const [patientUser, setPatientUser] = useState({
     name: 'Aravind Sharma',
+    phone: '+91 98765 43210',
     email: 'aravind.sharma@example.com',
     bloodType: 'O-',
     allergies: ['Penicillin', 'Sulfa Drugs'],
@@ -80,6 +82,18 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
   const [newContactRelation, setNewContactRelation] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [backendOnline, setBackendOnline] = useState(false);
+  const backendInfo = ApiService.getBackendInfo();
+
+  useEffect(() => {
+    const ping = async () => {
+      const ok = await ApiService.checkHealth();
+      setBackendOnline(ok);
+    };
+    ping();
+    const interval = setInterval(ping, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -99,7 +113,7 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
     showToast('Fingerprint minutiae template generated (local hash only)');
   };
 
-  const handleSaveEmergencyProfile = (e: React.FormEvent) => {
+  const handleSaveEmergencyProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     soundFx.playMatchSuccess();
     setPatientUser(prev => ({
@@ -108,7 +122,30 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
       fingerprintRegistered: tempFingerprintCaptured,
       profileCompleteness: 100
     }));
-    showToast('Emergency Profile Saved & Synced with ABDM Gateway!');
+
+    try {
+      await ApiService.createPatient({
+        phone_hash: patientUser.phone.replace(/[^0-9]/g, '') || '9876543210',
+        full_name: patientUser.name,
+        email: patientUser.email,
+        date_of_birth: '1985-04-12',
+        gender: 'Male',
+        medical_profile: {
+          blood_type: patientUser.bloodType,
+          allergies: patientUser.allergies,
+          chronic_conditions: patientUser.chronicConditions,
+          current_medications: patientUser.medications,
+          emergency_contacts: patientUser.emergencyContacts,
+          organ_donor: patientUser.organDonor,
+          resuscitation_preference: 'Full Code',
+          notes: 'Registered via MedAccess Patient Self-Service Portal'
+        }
+      });
+      showToast('Emergency Profile Saved & Synced with ABDM Cloud Gateway!');
+    } catch {
+      showToast('Profile Saved locally (Offline Standalone Mode)');
+    }
+
     setActiveTab('qr-code');
   };
 
@@ -131,6 +168,18 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Live Backend Connection Indicator */}
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#1A1A24] border border-[#2B2B3E]" title={backendInfo.url}>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                backendOnline ? 'bg-[#C9F24B] animate-ping' : 'bg-amber-400'
+              }`}
+            />
+            <span className="text-[11px] text-[#A0A0B0] font-mono">
+              {backendOnline ? (backendInfo.isCloud ? 'CLOUD DB' : 'LOCAL DB') : 'OFFLINE'}
+            </span>
+          </div>
+
           <button
             onClick={onOpenDoctorPortal}
             className="px-3.5 py-2 bg-[#1A1A24] hover:bg-[#2B2B3E] border border-[#2B2B3E] text-xs font-bold text-[#F2F2F5] rounded-lg transition"
