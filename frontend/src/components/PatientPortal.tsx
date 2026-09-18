@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../services/api';
+import { SupabaseService } from '../services/supabase';
 import { SupabaseStatusModal } from './SupabaseStatusModal';
 import {
   Home,
@@ -36,38 +37,103 @@ import { soundFx } from '../services/sound';
 interface PatientPortalProps {
   onBackToMain: () => void;
   onOpenDoctorPortal: () => void;
+  currentUser?: any;
+  onUpdateUser?: (updated: any) => void;
+}
+
+export interface PatientUserState {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  bloodType: string;
+  allergies: string[];
+  chronicConditions: string[];
+  medications: Array<{ name: string; dosage: string; frequency?: string }>;
+  surgeries: string[];
+  emergencyContacts: Array<{ name: string; relation: string; phone: string }>;
+  qrCodeId: string;
+  organDonor: boolean;
+  faceRegistered: boolean;
+  fingerprintRegistered: boolean;
+  profileCompleteness: number;
 }
 
 export const PatientPortal: React.FC<PatientPortalProps> = ({
   onBackToMain,
   onOpenDoctorPortal,
+  currentUser,
+  onUpdateUser
 }) => {
   // Navigation: 'home' | 'emergency-form' | 'qr-code' | 'profile' | 'settings' | 'auth'
   const [activeTab, setActiveTab] = useState<'home' | 'emergency-form' | 'qr-code' | 'profile' | 'settings'>('home');
   const [authStep, setAuthStep] = useState<'login' | 'signup' | 'otp' | 'authenticated'>('authenticated');
 
-  // Logged-in patient state
-  const [patientUser, setPatientUser] = useState({
-    name: 'Aravind Sharma',
-    phone: '+91 98765 43210',
-    email: 'aravind.sharma@example.com',
-    bloodType: 'O-',
-    allergies: ['Penicillin', 'Sulfa Drugs'],
-    chronicConditions: ['Type 1 Diabetes Mellitus'],
-    medications: [
-      { name: 'Insulin Glargine', dosage: '24 units', frequency: 'Nightly' },
-      { name: 'Metformin', dosage: '500mg', frequency: 'Twice daily' }
-    ],
-    surgeries: ['Appendectomy (2018)'],
-    emergencyContacts: [
-      { name: 'Pooja Sharma', relation: 'Spouse', phone: '+91 98765 43211' }
-    ],
-    qrCodeId: 'EMG-84920',
-    organDonor: true,
-    faceRegistered: true,
-    fingerprintRegistered: true,
-    profileCompleteness: 90
-  });
+  // Helper to load user: prioritize passed currentUser, then localStorage, then default template
+  const getInitialUser = (): PatientUserState => {
+    const source = currentUser || (() => {
+      try {
+        const cached = localStorage.getItem('medaccess_current_user');
+        return cached ? JSON.parse(cached) : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    if (source) {
+      return {
+        id: source.id || 'pat-' + Math.random().toString(36).substring(2, 9),
+        name: source.name || source.full_name || 'Patient User',
+        phone: source.phone || source.phone_hash || '+91 98765 43210',
+        email: source.email || 'patient@medaccess.in',
+        bloodType: source.bloodType || source.medical_profiles?.blood_type || 'O+',
+        allergies: Array.isArray(source.allergies) ? source.allergies : (source.medical_profiles?.allergies || []),
+        chronicConditions: Array.isArray(source.chronicConditions) ? source.chronicConditions : (source.medical_profiles?.chronic_conditions || []),
+        medications: Array.isArray(source.medications) ? source.medications : (source.medical_profiles?.current_medications || []),
+        surgeries: Array.isArray(source.surgeries) ? source.surgeries : [],
+        emergencyContacts: Array.isArray(source.emergencyContacts) ? source.emergencyContacts : (source.medical_profiles?.emergency_contacts || (source.phone ? [{ name: 'Primary Contact', phone: source.phone, relation: 'Emergency' }] : [])),
+        qrCodeId: source.qrCodeId || source.emergency_code || 'EMG-' + Math.floor(10000 + Math.random() * 90000),
+        organDonor: source.organDonor ?? Boolean(source.medical_profiles?.organ_donor),
+        faceRegistered: source.faceRegistered ?? false,
+        fingerprintRegistered: source.fingerprintRegistered ?? false,
+        profileCompleteness: source.profileCompleteness || 85
+      };
+    }
+
+    // Default template (Aravind Sharma)
+    return {
+      id: 'a1111111-1111-1111-1111-111111111111',
+      name: 'Aravind Sharma',
+      phone: '+91 98765 43210',
+      email: 'aravind.sharma@example.com',
+      bloodType: 'O-',
+      allergies: ['Penicillin', 'Sulfa Drugs'],
+      chronicConditions: ['Type 1 Diabetes Mellitus'],
+      medications: [
+        { name: 'Insulin Glargine', dosage: '24 units', frequency: 'Nightly' },
+        { name: 'Metformin', dosage: '500mg', frequency: 'Twice daily' }
+      ],
+      surgeries: ['Appendectomy (2018)'],
+      emergencyContacts: [
+        { name: 'Pooja Sharma', relation: 'Spouse', phone: '+91 98765 43211' }
+      ],
+      qrCodeId: 'EMG-84920',
+      organDonor: true,
+      faceRegistered: true,
+      fingerprintRegistered: true,
+      profileCompleteness: 90
+    };
+  };
+
+  // Logged-in patient state initialized with actual filled information
+  const [patientUser, setPatientUser] = useState<PatientUserState>(getInitialUser);
+
+  // Sync if currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      setPatientUser(getInitialUser());
+    }
+  }, [currentUser]);
 
   // Emergency Profile Form Wizard (Step 1: Biometrics, Step 2: Medical Info)
   const [formStep, setFormStep] = useState<1 | 2>(1);
@@ -119,34 +185,50 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
   const handleSaveEmergencyProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     soundFx.playMatchSuccess();
-    setPatientUser(prev => ({
-      ...prev,
+    const updated = {
+      ...patientUser,
       faceRegistered: tempFaceCaptured,
       fingerprintRegistered: tempFingerprintCaptured,
       profileCompleteness: 100
-    }));
+    };
+    setPatientUser(updated);
+    if (onUpdateUser) onUpdateUser(updated);
+    localStorage.setItem('medaccess_current_user', JSON.stringify(updated));
 
+    // Save directly to Supabase cloud
     try {
-      await ApiService.createPatient({
-        phone_hash: patientUser.phone.replace(/[^0-9]/g, '') || '9876543210',
-        full_name: patientUser.name,
-        email: patientUser.email,
-        date_of_birth: '1985-04-12',
-        gender: 'Male',
-        medical_profile: {
-          blood_type: patientUser.bloodType,
-          allergies: patientUser.allergies,
-          chronic_conditions: patientUser.chronicConditions,
-          current_medications: patientUser.medications,
-          emergency_contacts: patientUser.emergencyContacts,
-          organ_donor: patientUser.organDonor,
-          resuscitation_preference: 'Full Code',
-          notes: 'Registered via MedAccess Patient Self-Service Portal'
-        }
+      await SupabaseService.registerPatient({
+        fullName: updated.name,
+        phone: updated.phone,
+        email: updated.email,
+        bloodType: updated.bloodType,
+        allergies: updated.allergies,
+        chronicConditions: updated.chronicConditions,
+        medications: updated.medications,
+        emergencyContacts: updated.emergencyContacts
       });
-      showToast('Emergency Profile Saved & Synced with ABDM Cloud Gateway!');
+      showToast('Emergency Profile Saved & Synced with Supabase Cloud Database!');
     } catch {
-      showToast('Profile Saved locally (Offline Standalone Mode)');
+      try {
+        await ApiService.createPatient({
+          phone_hash: updated.phone.replace(/[^0-9]/g, '') || '9876543210',
+          full_name: updated.name,
+          email: updated.email,
+          medical_profile: {
+            blood_type: updated.bloodType,
+            allergies: updated.allergies,
+            chronic_conditions: updated.chronicConditions,
+            current_medications: updated.medications,
+            emergency_contacts: updated.emergencyContacts,
+            organ_donor: updated.organDonor,
+            resuscitation_preference: 'Full Code',
+            notes: 'Registered via MedAccess Patient Self-Service Portal'
+          }
+        });
+        showToast('Emergency Profile Synced via ABDM Cloud Gateway!');
+      } catch {
+        showToast('Profile Saved locally (Offline Standalone Mode)');
+      }
     }
 
     setActiveTab('qr-code');

@@ -116,6 +116,76 @@ export class PatientController {
         return;
       }
 
+      const emergency_code = 'EMG-' + Math.floor(100 + Math.random() * 900);
+
+      // 1. If Supabase is available, persist to cloud PostgreSQL
+      if (supabase) {
+        try {
+          // Check if patient already exists by phone
+          const { data: existing } = await supabase
+            .from('patients')
+            .select('*, medical_profiles(*)')
+            .eq('phone_hash', phone_hash)
+            .limit(1)
+            .maybeSingle();
+
+          if (existing) {
+            res.status(200).json({
+              success: true,
+              data: existing
+            });
+            return;
+          }
+
+          const { data: insertedPatient, error: pErr } = await supabase
+            .from('patients')
+            .insert([{
+              phone_hash,
+              email: email || undefined,
+              full_name,
+              date_of_birth: date_of_birth || undefined,
+              gender: gender || 'Unspecified',
+              emergency_code
+            }])
+            .select()
+            .single();
+
+          if (!pErr && insertedPatient) {
+            let insertedProfile = null;
+            if (medical_profile) {
+              const { data: pData } = await supabase
+                .from('medical_profiles')
+                .insert([{
+                  patient_id: insertedPatient.id,
+                  blood_type: medical_profile.blood_type || 'Unknown',
+                  allergies: medical_profile.allergies || [],
+                  chronic_conditions: medical_profile.chronic_conditions || [],
+                  current_medications: medical_profile.current_medications || [],
+                  emergency_contacts: medical_profile.emergency_contacts || [],
+                  organ_donor: Boolean(medical_profile.organ_donor),
+                  resuscitation_preference: medical_profile.resuscitation_preference || 'Full Code',
+                  notes: medical_profile.notes || ''
+                }])
+                .select()
+                .single();
+              insertedProfile = pData;
+            }
+
+            res.status(201).json({
+              success: true,
+              data: {
+                ...insertedPatient,
+                medical_profiles: insertedProfile
+              }
+            });
+            return;
+          }
+        } catch (dbErr) {
+          console.warn('Supabase patient insert failed, falling back to local store:', dbErr);
+        }
+      }
+
+      // 2. Local fallback store
       const newId = 'pat-' + Math.random().toString(36).substring(2, 9);
       const newPatient = {
         id: newId,
@@ -124,7 +194,7 @@ export class PatientController {
         full_name,
         date_of_birth: date_of_birth || undefined,
         gender: gender || 'Unspecified',
-        emergency_code: 'EMG-' + Math.floor(100 + Math.random() * 900),
+        emergency_code,
         created_at: new Date().toISOString()
       };
 

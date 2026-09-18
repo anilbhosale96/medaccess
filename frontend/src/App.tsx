@@ -21,6 +21,14 @@ export default function App() {
   const [view, setView] = useState<'splash' | 'onboarding' | 'landing' | 'patient-portal' | 'login' | 'dashboard' | 'emergency-select' | 'biometric' | 'manual' | 'patient'>('landing');
   
   // Patient & Clinical State
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const cached = localStorage.getItem('medaccess_current_user');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [selectedPatient, setSelectedPatient] = useState<PatientFullRecord | null>(null);
   const [matchData, setMatchData] = useState<BiometricMatchResult | null>(null);
   const [aiTriage, setAiTriage] = useState<AITriageResponse | null>(null);
@@ -94,6 +102,11 @@ export default function App() {
   if (view === 'patient-portal') {
     return (
       <PatientPortal
+        currentUser={currentUser}
+        onUpdateUser={(updated) => {
+          setCurrentUser(updated);
+          localStorage.setItem('medaccess_current_user', JSON.stringify(updated));
+        }}
         onBackToMain={() => setView('landing')}
         onOpenDoctorPortal={() => setView('dashboard')}
       />
@@ -117,7 +130,10 @@ export default function App() {
     return (
       <LoginPage
         onBackToHome={() => setView('landing')}
-        onLoginSuccess={(role, userName) => {
+        onLoginSuccess={(role, userName, userData) => {
+          if (userData) {
+            setCurrentUser(userData);
+          }
           if (role === 'patient') {
             setView('patient-portal');
           } else {

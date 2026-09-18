@@ -153,6 +153,103 @@ export const SupabaseService = {
   },
 
   /**
+   * Register patient and medical profile directly into Supabase
+   */
+  async registerPatient(payload: {
+    fullName: string;
+    phone: string;
+    email?: string;
+    bloodType?: string;
+    allergies?: string[];
+    chronicConditions?: string[];
+    medications?: any[];
+    emergencyContacts?: any[];
+  }): Promise<PatientFullRecord | null> {
+    try {
+      const phoneClean = payload.phone.replace(/[^0-9]/g, '');
+      const emergencyCode = 'EMG-' + Math.floor(100 + Math.random() * 900);
+
+      // 1. Check if patient already exists
+      const { data: existing } = await supabase
+        .from('patients')
+        .select('*, medical_profiles(*)')
+        .eq('phone_hash', phoneClean)
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        return existing as unknown as PatientFullRecord;
+      }
+
+      // 2. Insert patient
+      const { data: patient, error: pErr } = await supabase
+        .from('patients')
+        .insert([{
+          phone_hash: phoneClean,
+          full_name: payload.fullName,
+          email: payload.email || null,
+          gender: 'Unspecified',
+          emergency_code: emergencyCode
+        }])
+        .select()
+        .single();
+
+      if (pErr || !patient) {
+        console.warn('Supabase patient insert error:', pErr);
+        return null;
+      }
+
+      // 3. Insert medical profile
+      const { data: profile } = await supabase
+        .from('medical_profiles')
+        .insert([{
+          patient_id: patient.id,
+          blood_type: payload.bloodType || 'O+',
+          allergies: payload.allergies || [],
+          chronic_conditions: payload.chronicConditions || [],
+          current_medications: payload.medications || [],
+          emergency_contacts: payload.emergencyContacts || [],
+          organ_donor: false,
+          resuscitation_preference: 'Full Code',
+          notes: 'Registered via MedAccess Citizen Portal'
+        }])
+        .select()
+        .single();
+
+      return {
+        ...patient,
+        medical_profiles: profile
+      } as unknown as PatientFullRecord;
+    } catch (err) {
+      console.warn('Supabase direct registration error:', err);
+      return null;
+    }
+  },
+
+  /**
+   * Find patient by phone or email
+   */
+  async findPatient(identifier: string): Promise<PatientFullRecord | null> {
+    try {
+      const clean = identifier.replace(/[^0-9]/g, '');
+      let q = supabase.from('patients').select('*, medical_profiles(*)');
+      if (identifier.includes('@')) {
+        q = q.eq('email', identifier.trim());
+      } else if (clean.length >= 8) {
+        q = q.eq('phone_hash', clean);
+      } else {
+        q = q.or(`emergency_code.eq.${identifier.trim()},full_name.ilike.%${identifier.trim()}%`);
+      }
+
+      const { data, error } = await q.limit(1).maybeSingle();
+      if (error || !data) return null;
+      return data as unknown as PatientFullRecord;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * Subscribe to live Realtime patient registrations / updates
    */
   subscribeToPatients(onPatientChange: (patient: any) => void) {

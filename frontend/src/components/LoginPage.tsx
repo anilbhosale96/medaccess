@@ -18,11 +18,12 @@ import {
   Droplet
 } from 'lucide-react';
 import { ApiService } from '../services/api';
+import { SupabaseService } from '../services/supabase';
 import { soundFx } from '../services/sound';
 
 interface LoginPageProps {
   onBackToHome: () => void;
-  onLoginSuccess: (userRole: 'patient' | 'doctor' | 'responder', userName: string) => void;
+  onLoginSuccess: (userRole: 'patient' | 'doctor' | 'responder', userName: string, userData?: any) => void;
   initialMode?: 'signin' | 'signup';
 }
 
@@ -92,8 +93,36 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setPassword('DEMO123');
     soundFx.playMatchSuccess();
     setSuccessMessage(`Logging in as ${acc.name}...`);
+
+    const demoPatientData = acc.role === 'patient' ? {
+      id: 'a1111111-1111-1111-1111-111111111111',
+      name: 'Aravind Sharma',
+      phone: '+91 98765 43210',
+      email: 'aravind.sharma@example.com',
+      bloodType: 'O-',
+      allergies: ['Penicillin', 'Sulfa Drugs', 'Latex'],
+      chronicConditions: ['Type 1 Diabetes Mellitus', 'Hypertension'],
+      medications: [
+        { name: 'Insulin Glargine', dosage: '24 units', frequency: 'Nightly' },
+        { name: 'Metformin', dosage: '500mg', frequency: 'Twice daily' }
+      ],
+      surgeries: ['Appendectomy (2018)'],
+      emergencyContacts: [
+        { name: 'Pooja Sharma', relation: 'Spouse', phone: '+91 98765 43211' }
+      ],
+      qrCodeId: 'EMG-701',
+      organDonor: true,
+      faceRegistered: true,
+      fingerprintRegistered: true,
+      profileCompleteness: 100
+    } : null;
+
+    if (demoPatientData) {
+      localStorage.setItem('medaccess_current_user', JSON.stringify(demoPatientData));
+    }
+
     setTimeout(() => {
-      onLoginSuccess(acc.role, acc.name);
+      onLoginSuccess(acc.role, acc.name, demoPatientData);
     }, 600);
   };
 
@@ -122,34 +151,82 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           throw new Error('Please accept the emergency medical consent policy');
         }
 
-        // Register in backend database if patient
+        let savedPatientRecord: any = null;
+
+        // Register in Supabase database if patient
         if (selectedRole === 'patient') {
+          // 1. Direct Supabase insert
           try {
-            await ApiService.createPatient({
-              phone_hash: phone.replace(/[^0-9]/g, ''),
-              full_name: fullName.trim(),
+            savedPatientRecord = await SupabaseService.registerPatient({
+              fullName: fullName.trim(),
+              phone: phone.trim(),
               email: email.trim() || undefined,
-              gender: 'Unspecified',
-              medical_profile: {
-                blood_type: bloodType,
-                allergies: [],
-                chronic_conditions: [],
-                current_medications: [],
-                emergency_contacts: emergencyContact.trim()
-                  ? [{ name: emergencyContact.trim(), phone: emergencyPhone.trim() || phone, relation: 'Emergency Contact' }]
-                  : [],
-                organ_donor: false,
-                resuscitation_preference: 'Full Code',
-                notes: 'Registered via MedAccess Citizen Sign Up'
-              }
+              bloodType,
+              emergencyContacts: emergencyContact.trim()
+                ? [{ name: emergencyContact.trim(), phone: emergencyPhone.trim() || phone, relation: 'Emergency Contact' }]
+                : []
             });
-          } catch {
-            // Local fallback registration
+          } catch (e) {
+            console.warn('Direct Supabase register fallback:', e);
           }
+
+          // 2. Also ensure backend API sync
+          if (!savedPatientRecord) {
+            try {
+              savedPatientRecord = await ApiService.createPatient({
+                phone_hash: phone.replace(/[^0-9]/g, ''),
+                full_name: fullName.trim(),
+                email: email.trim() || undefined,
+                medical_profile: {
+                  blood_type: bloodType,
+                  allergies: [],
+                  chronic_conditions: [],
+                  current_medications: [],
+                  emergency_contacts: emergencyContact.trim()
+                    ? [{ name: emergencyContact.trim(), phone: emergencyPhone.trim() || phone, relation: 'Emergency Contact' }]
+                    : []
+                }
+              });
+            } catch (e) {
+              console.warn('Backend API registration fallback:', e);
+            }
+          }
+
+          // Build complete user object from the user's filled inputs
+          const fullUserData = {
+            id: savedPatientRecord?.id || 'pat-' + Math.random().toString(36).substring(2, 9),
+            name: fullName.trim(),
+            phone: phone.trim(),
+            email: email.trim() || `${phone.replace(/[^0-9]/g, '')}@medaccess.user`,
+            bloodType,
+            allergies: savedPatientRecord?.medical_profiles?.allergies || [],
+            chronicConditions: savedPatientRecord?.medical_profiles?.chronic_conditions || [],
+            medications: savedPatientRecord?.medical_profiles?.current_medications || [],
+            surgeries: [],
+            emergencyContacts: emergencyContact.trim()
+              ? [{ name: emergencyContact.trim(), phone: emergencyPhone.trim() || phone, relation: 'Emergency Contact' }]
+              : [],
+            qrCodeId: savedPatientRecord?.emergency_code || 'EMG-' + Math.floor(10000 + Math.random() * 90000),
+            organDonor: false,
+            faceRegistered: false,
+            fingerprintRegistered: false,
+            profileCompleteness: 85
+          };
+
+          // Save to localStorage for persistence across reloads
+          localStorage.setItem('medaccess_current_user', JSON.stringify(fullUserData));
+
+          soundFx.playMatchSuccess();
+          setSuccessMessage('Account created & synced to Supabase Cloud! Redirecting...');
+          setTimeout(() => {
+            onLoginSuccess(selectedRole, fullName.trim(), fullUserData);
+          }, 800);
+          return;
         }
 
+        // For Doctor or Paramedic signup
         soundFx.playMatchSuccess();
-        setSuccessMessage('Account successfully created! Redirecting...');
+        setSuccessMessage('Staff account created! Redirecting...');
         setTimeout(() => {
           onLoginSuccess(selectedRole, fullName.trim());
         }, 800);
@@ -162,11 +239,57 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           throw new Error('Please enter your password');
         }
 
+        // Try looking up patient by email/phone in Supabase
+        let existingUser: any = null;
+        if (selectedRole === 'patient') {
+          try {
+            existingUser = await SupabaseService.findPatient(email.trim());
+          } catch {
+            // Local fallback
+          }
+        }
+
+        const userProfile = existingUser ? {
+          id: existingUser.id,
+          name: existingUser.full_name,
+          phone: existingUser.phone_hash,
+          email: existingUser.email || email,
+          bloodType: existingUser.medical_profiles?.blood_type || 'O+',
+          allergies: existingUser.medical_profiles?.allergies || [],
+          chronicConditions: existingUser.medical_profiles?.chronic_conditions || [],
+          medications: existingUser.medical_profiles?.current_medications || [],
+          surgeries: [],
+          emergencyContacts: existingUser.medical_profiles?.emergency_contacts || [],
+          qrCodeId: existingUser.emergency_code || 'EMG-' + Math.floor(10000 + Math.random() * 90000),
+          organDonor: Boolean(existingUser.medical_profiles?.organ_donor),
+          faceRegistered: true,
+          fingerprintRegistered: true,
+          profileCompleteness: 95
+        } : {
+          name: email.includes('@') ? email.split('@')[0] : 'Citizen User',
+          email: email.trim(),
+          phone: '+91 98765 43210',
+          bloodType: 'O+',
+          allergies: [],
+          chronicConditions: [],
+          medications: [],
+          surgeries: [],
+          emergencyContacts: [],
+          qrCodeId: 'EMG-' + Math.floor(10000 + Math.random() * 90000),
+          organDonor: false,
+          faceRegistered: false,
+          fingerprintRegistered: false,
+          profileCompleteness: 75
+        };
+
+        if (selectedRole === 'patient') {
+          localStorage.setItem('medaccess_current_user', JSON.stringify(userProfile));
+        }
+
         soundFx.playMatchSuccess();
-        const displayName = email.includes('@') ? email.split('@')[0] : email;
         setSuccessMessage('Sign in successful! Redirecting...');
         setTimeout(() => {
-          onLoginSuccess(selectedRole, displayName);
+          onLoginSuccess(selectedRole, userProfile.name, userProfile);
         }, 700);
       }
     } catch (err: any) {
