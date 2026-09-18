@@ -17,8 +17,8 @@ import { PatientFullRecord, BiometricMatchResult, AITriageResponse } from './typ
 import { ShieldAlert, Scan, Search, AlertCircle, ChevronRight, Zap } from 'lucide-react';
 
 export default function App() {
-  // Master Navigation State: 'splash' | 'onboarding' | 'landing' | 'patient-portal' | 'login' | 'dashboard' | 'emergency-select' | 'biometric' | 'manual' | 'patient'
-  const [view, setView] = useState<'splash' | 'onboarding' | 'landing' | 'patient-portal' | 'login' | 'dashboard' | 'emergency-select' | 'biometric' | 'manual' | 'patient'>('splash');
+  // Master Navigation State: 'landing' | 'patient-portal' | 'login' | 'dashboard' | 'emergency-select' | 'biometric' | 'manual' | 'patient' | 'splash' | 'onboarding'
+  const [view, setView] = useState<'splash' | 'onboarding' | 'landing' | 'patient-portal' | 'login' | 'dashboard' | 'emergency-select' | 'biometric' | 'manual' | 'patient'>('landing');
   
   // Patient & Clinical State
   const [selectedPatient, setSelectedPatient] = useState<PatientFullRecord | null>(null);
