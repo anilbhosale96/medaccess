@@ -112,12 +112,18 @@ export default function App() {
     );
   }
 
-  // 5. SIGN IN / LOGIN PAGE VIEW (Figma Design: Role Selector + Demo Credentials)
+  // 5. SIGN IN / SIGN UP AUTHENTICATION VIEW
   if (view === 'login') {
     return (
       <LoginPage
         onBackToHome={() => setView('landing')}
-        onLoginSuccess={() => setView('dashboard')}
+        onLoginSuccess={(role, userName) => {
+          if (role === 'patient') {
+            setView('patient-portal');
+          } else {
+            setView('dashboard');
+          }
+        }}
       />
     );
   }

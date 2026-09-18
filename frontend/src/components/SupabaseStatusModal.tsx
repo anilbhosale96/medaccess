@@ -156,3 +156,4 @@ export const SupabaseStatusModal: React.FC<SupabaseStatusModalProps> = ({ isOpen
     </div>
   );
 };
+
