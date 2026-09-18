@@ -29,6 +29,22 @@ export default {
           500: '#22c55e',
           600: '#16a34a',
           700: '#15803d',
+        },
+        med: {
+          bg: '#0A0A0F',
+          card: '#12121A',
+          nested: '#1A1A24',
+          border: '#2B2B3E',
+          subtleBorder: '#1F1F2E',
+          lime: '#C9F24B',
+          purple: '#8B5CF6',
+          blue: '#3B82F6',
+          text: '#F2F2F5',
+          muted: '#A0A0B0',
+          subtle: '#6B7280',
+          red: '#FF4D4D',
+          green: '#4ADE80',
+          amber: '#FBBF24',
         }
       },
       animation: {

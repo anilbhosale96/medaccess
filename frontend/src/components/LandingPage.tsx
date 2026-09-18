@@ -18,12 +18,14 @@ interface LandingPageProps {
   onGoToEmergency: () => void;
   onGoToLogin: () => void;
   onGoToDashboard: () => void;
+  onGoToPatient: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onGoToEmergency,
   onGoToLogin,
   onGoToDashboard,
+  onGoToPatient,
 }) => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-blue-600 selection:text-white">
@@ -44,16 +46,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           {/* Right Action Links */}
-          <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <button
+              onClick={onGoToPatient}
+              className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-800 transition px-2.5 py-1.5 rounded-lg hover:bg-blue-50"
+            >
+              Patient Portal
+            </button>
             <button
               onClick={onGoToLogin}
-              className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition px-3 py-2"
+              className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition px-2.5 py-1.5"
             >
               Login
             </button>
             <button
               onClick={onGoToEmergency}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2"
+              className="px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-1.5"
             >
               <ShieldAlert className="w-4 h-4" />
               <span>Emergency Access</span>
@@ -84,14 +92,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Subtitle */}
           <p className="text-slate-300 text-base sm:text-lg max-w-2xl font-normal leading-relaxed">
-            Securely access essential medical information during emergencies and help healthcare professionals make faster, safer decisions.
+            Securely access essential medical information during emergencies and help healthcare professionals make faster, safer decisions in the Golden Hour.
           </p>
 
           {/* Hero CTAs */}
-          <div className="pt-2 flex flex-wrap items-center gap-4">
+          <div className="pt-2 flex flex-wrap items-center gap-3 sm:gap-4">
             <button
               onClick={onGoToEmergency}
-              className="px-6 py-3.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold rounded-xl shadow-xl hover:shadow-red-600/30 transition flex items-center gap-2 text-sm sm:text-base group"
+              className="px-5 sm:px-6 py-3.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold rounded-xl shadow-xl hover:shadow-red-600/30 transition flex items-center gap-2 text-sm sm:text-base group"
             >
               <AlertCircle className="w-5 h-5 text-white" />
               <span>Emergency Access</span>
@@ -100,9 +108,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             <button
               onClick={onGoToDashboard}
-              className="px-6 py-3.5 bg-slate-800/90 hover:bg-slate-750 text-slate-100 font-bold rounded-xl border border-slate-700 shadow-md hover:border-slate-500 transition text-sm sm:text-base"
+              className="px-5 sm:px-6 py-3.5 bg-slate-800/90 hover:bg-slate-750 text-slate-100 font-bold rounded-xl border border-slate-700 shadow-md hover:border-slate-500 transition text-sm sm:text-base"
             >
-              Login to Dashboard
+              Doctor / Hospital ER
+            </button>
+
+            <button
+              onClick={onGoToPatient}
+              className="px-5 sm:px-6 py-3.5 bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold rounded-xl border border-emerald-500 shadow-md transition text-sm sm:text-base"
+            >
+              Patient Self-Registration
             </button>
           </div>
         </div>
