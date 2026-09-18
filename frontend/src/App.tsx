@@ -11,6 +11,7 @@ import { ManualSearch } from './components/ManualSearch';
 import { PatientCard } from './components/PatientCard';
 import { AITriageSummary } from './components/AITriageSummary';
 import { AuditLogModal } from './components/AuditLogModal';
+import { SupabaseStatusModal } from './components/SupabaseStatusModal';
 import { ApiService } from './services/api';
 import { PatientFullRecord, BiometricMatchResult, AITriageResponse } from './types';
 import { ShieldAlert, Scan, Search, AlertCircle, ChevronRight, Zap } from 'lucide-react';
@@ -27,6 +28,7 @@ export default function App() {
   
   // System State
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -144,6 +146,7 @@ export default function App() {
       {/* Emergency Top Navigation Header */}
       <EmergencyHeader
         onOpenAuditLogs={() => setIsAuditModalOpen(true)}
+        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
         onReset={() => {
           if (view === 'patient') {
             setView('emergency-select');
@@ -423,6 +426,12 @@ export default function App() {
       <AuditLogModal
         isOpen={isAuditModalOpen}
         onClose={() => setIsAuditModalOpen(false)}
+      />
+
+      {/* Supabase PostgreSQL Cloud Status Modal */}
+      <SupabaseStatusModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
       />
     </div>
   );

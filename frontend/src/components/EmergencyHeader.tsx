@@ -1,9 +1,10 @@
 import React from 'react';
-import { ShieldAlert, Activity, FileText, ArrowLeft, Globe } from 'lucide-react';
+import { ShieldAlert, Activity, FileText, ArrowLeft, Globe, Database } from 'lucide-react';
 import { ApiService } from '../services/api';
 
 interface EmergencyHeaderProps {
   onOpenAuditLogs: () => void;
+  onOpenSupabaseModal?: () => void;
   onReset: () => void;
   isViewingPatient: boolean;
   backendOnline: boolean;
@@ -11,6 +12,7 @@ interface EmergencyHeaderProps {
 
 export const EmergencyHeader: React.FC<EmergencyHeaderProps> = ({
   onOpenAuditLogs,
+  onOpenSupabaseModal,
   onReset,
   isViewingPatient,
   backendOnline,
@@ -52,6 +54,18 @@ export const EmergencyHeader: React.FC<EmergencyHeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Supabase Status Pill */}
+          {onOpenSupabaseModal && (
+            <button
+              onClick={onOpenSupabaseModal}
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 transition"
+              title="Inspect Supabase PostgreSQL Cloud Database"
+            >
+              <Database className="w-3 h-3 text-emerald-400" />
+              <span className="text-[11px] font-mono tracking-tight hidden sm:inline">SUPABASE DB</span>
+            </button>
+          )}
+
           {/* Connection Status */}
           <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-black/30 border border-white/10" title={backendInfo.url}>
             <span

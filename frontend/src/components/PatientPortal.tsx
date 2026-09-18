@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../services/api';
+import { SupabaseStatusModal } from './SupabaseStatusModal';
 import {
   Home,
   User,
@@ -27,7 +28,8 @@ import {
   Copy,
   Check,
   Zap,
-  Activity
+  Activity,
+  Database
 } from 'lucide-react';
 import { soundFx } from '../services/sound';
 
@@ -83,6 +85,7 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const backendInfo = ApiService.getBackendInfo();
 
   useEffect(() => {
@@ -168,6 +171,16 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Supabase Cloud DB Badge */}
+          <button
+            onClick={() => setIsSupabaseModalOpen(true)}
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 transition shadow-xs"
+            title="Inspect Supabase PostgreSQL Cloud Database"
+          >
+            <Database className="w-3 h-3 text-emerald-400" />
+            <span className="text-[11px] font-mono tracking-tight hidden sm:inline">SUPABASE DB</span>
+          </button>
+
           {/* Live Backend Connection Indicator */}
           <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#1A1A24] border border-[#2B2B3E]" title={backendInfo.url}>
             <span
@@ -176,7 +189,7 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
               }`}
             />
             <span className="text-[11px] text-[#A0A0B0] font-mono">
-              {backendOnline ? (backendInfo.isCloud ? 'CLOUD DB' : 'LOCAL DB') : 'OFFLINE'}
+              {backendOnline ? (backendInfo.isCloud ? 'CLOUD API' : 'LOCAL API') : 'OFFLINE'}
             </span>
           </div>
 
@@ -869,6 +882,12 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
           <span>Settings</span>
         </button>
       </nav>
+
+      {/* Supabase PostgreSQL Cloud Status Modal */}
+      <SupabaseStatusModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+      />
     </div>
   );
 };

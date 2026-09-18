@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../services/api';
+import { SupabaseService } from '../services/supabase';
+import { SupabaseStatusModal } from './SupabaseStatusModal';
 import {
   Zap,
   ShieldAlert,
@@ -37,7 +39,8 @@ import {
   Sparkles,
   Phone,
   Calendar,
-  AlertOctagon
+  AlertOctagon,
+  Database
 } from 'lucide-react';
 import { PatientFullRecord } from '../types';
 import { soundFx } from '../services/sound';
@@ -90,6 +93,7 @@ export const HospitalDashboard: React.FC<HospitalDashboardProps> = ({
   });
 
   const [backendConnected, setBackendConnected] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [livePatients, setLivePatients] = useState<PatientFullRecord[]>([]);
   const backendInfo = ApiService.getBackendInfo();
 
@@ -110,7 +114,25 @@ export const HospitalDashboard: React.FC<HospitalDashboardProps> = ({
     };
     check();
     const interval = setInterval(check, 10000);
-    return () => clearInterval(interval);
+
+    // Live Supabase Realtime Log Listener
+    const unsubscribeLogs = SupabaseService.subscribeToLogs((newLog) => {
+      soundFx.playBeep(987.77, 'sine', 0.15);
+      setNotifications(prev => [
+        {
+          id: Date.now(),
+          text: `⚡ Realtime HIPAA Event: ${newLog.reason} (${newLog.accessed_by})`,
+          time: 'Just now',
+          read: false
+        },
+        ...prev
+      ]);
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribeLogs();
+    };
   }, []);
   const allPatients: Array<{
     caseId: string;
@@ -570,6 +592,16 @@ export const HospitalDashboard: React.FC<HospitalDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Supabase PostgreSQL Cloud Badge */}
+            <button
+              onClick={() => setIsSupabaseModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900 rounded-full text-xs font-semibold transition shadow-xs"
+              title="Inspect Supabase PostgreSQL Cloud Database & Realtime Replication"
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline font-mono">Supabase DB</span>
+            </button>
+
             {/* Live API Status Badge */}
             <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
               backendConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
@@ -1590,6 +1622,12 @@ export const HospitalDashboard: React.FC<HospitalDashboardProps> = ({
           patient={wristbandPatient}
         />
       )}
+
+      {/* Supabase PostgreSQL Cloud Status Modal */}
+      <SupabaseStatusModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+      />
     </div>
   );
 };
