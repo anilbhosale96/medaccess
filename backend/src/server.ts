@@ -12,8 +12,24 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-staff-id']
 }));
-app.use(express.json({ limit: '10mb' })); // Allows base64 biometric payloads
-app.use(express.urlencoded({ extended: true }));
+// Body parsing middleware with Vercel serverless compatibility
+app.use((req, res, next) => {
+  if (req.body !== undefined && req.body !== null && (typeof req.body === 'object' || typeof req.body === 'string')) {
+    if (typeof req.body === 'string') {
+      try {
+        req.body = JSON.parse(req.body);
+      } catch {
+        // keep as is
+      }
+    }
+    return next();
+  }
+  express.json({ limit: '10mb' })(req, res, (err) => {
+    if (err) return next(err);
+    express.urlencoded({ extended: true })(req, res, next);
+  });
+});
+
 app.use(auditLoggerMiddleware);
 
 // Base Health Check
@@ -39,7 +55,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   console.error('Unhandled Server Error:', err);
   res.status(500).json({
     error: 'Internal Server Error',
-    message: ENV.NODE_ENV === 'development' ? err.message : undefined
+    message: err.message || 'An unexpected error occurred'
   });
 });
 

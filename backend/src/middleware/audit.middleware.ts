@@ -57,8 +57,8 @@ export async function logPatientAccess(logData: {
 }
 
 export function auditLoggerMiddleware(req: Request, res: Response, next: NextFunction) {
-  // Capture request IP
-  req.ipAddress = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+  // Capture request IP safely
+  req.ipAddress = (req.headers['x-forwarded-for'] as string) || req.ip || req.socket?.remoteAddress || '127.0.0.1';
   next();
 }
 
