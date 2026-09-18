@@ -823,3 +823,4 @@ export const PatientPortal: React.FC<PatientPortalProps> = ({
     </div>
   );
 };
+

@@ -117,3 +117,4 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     </div>
   );
 };
+
